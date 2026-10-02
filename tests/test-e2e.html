@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ED Priority Queue E2E Functional Test</title>
+</head>
+<body>
+  <h1>Emergency Department System E2E Automated Tests</h1>
+  <div id="results">Running E2E tests...</div>
+
+  <iframe id="appFrame" src="../index.html" style="width:1200px; height:800px; border:1px solid #ccc;"></iframe>
+
+  <script>
+    const frame = document.getElementById('appFrame');
+    
+    frame.onload = function() {
+      setTimeout(runE2ETests, 800);
+    };
+
+    function runE2ETests() {
+      const results = [];
+      let passed = 0;
+      let failed = 0;
+
+      function assert(condition, name, details = '') {
+        if (condition) {
+          passed++;
+          results.push({ name, status: 'PASS', details });
+          console.log(`✓ PASS: ${name}`);
+        } else {
+          failed++;
+          results.push({ name, status: 'FAIL', details });
+          console.error(`✗ FAIL: ${name} - ${details}`);
+        }
+      }
+
+      try {
+        const appWin = frame.contentWindow;
+        const appDoc = frame.contentDocument;
+        const app = appWin.app;
+
+        assert(!!app, "Application instance window.app initialized");
+        assert(!!app.priorityQueue, "PriorityQueue instance exists");
+        assert(app.priorityQueue.size() > 0, "Default waiting patients loaded into priority queue", `Size: ${app.priorityQueue.size()}`);
+
+        // Test 1: Check root of default queue is Priority 5 (Critical)
+        const root = app.priorityQueue.peek();
+        assert(root && root.priority === 5, "Root of queue is Priority 5 Critical patient", `Root is ${root ? root.name + ' (P' + root.priority + ')' : 'null'}`);
+
+        // Test 2: Hero section renders root patient
+        const heroName = appDoc.querySelector('#nextPatientHero h3');
+        assert(heroName && heroName.textContent.includes(root.name), "Hero card displays highest priority patient", heroName ? heroName.textContent : 'none');
+
+        // Test 3: Test Scenario Trio (Patient A, B, C)
+        console.log("Testing Scenario Demo A, B, C...");
+        app.applyScenarioData();
+        const scenarioOrder = app.priorityQueue.toArrayInOrder();
+        assert(scenarioOrder.length === 3, "Scenario loaded exactly 3 patients", `Count: ${scenarioOrder.length}`);
+        assert(scenarioOrder[0].id === 'P-B', "Scenario Rank 1 is Patient B (P5 Critical)", `Got: ${scenarioOrder[0].id} (P${scenarioOrder[0].priority})`);
+        assert(scenarioOrder[1].id === 'P-C', "Scenario Rank 2 is Patient C (P3 Urgent, 09:55)", `Got: ${scenarioOrder[1].id} (Arrival: ${scenarioOrder[1].arrivalTime})`);
+        assert(scenarioOrder[2].id === 'P-A', "Scenario Rank 3 is Patient A (P3 Urgent, 10:00)", `Got: ${scenarioOrder[2].id} (Arrival: ${scenarioOrder[2].arrivalTime})`);
+
+        // Test 4: Call Next Patient on Scenario
+        // Patient B should be dequeued and assigned to first available doctor
+        const availableDoc = app.doctors.find(d => d.status === 'Available');
+        assert(!!availableDoc, "Found available doctor for treatment", availableDoc ? availableDoc.name : 'None');
+        
+        app.callNextPatient();
+        assert(app.priorityQueue.peek().id === 'P-C', "After calling Patient B, next patient in queue is Patient C", `Now root: ${app.priorityQueue.peek().id}`);
+
+        const treatingPatientB = app.allPatients.find(p => p.id === 'P-B');
+        assert(treatingPatientB.status === 'Being Treated', "Patient B status changed to 'Being Treated'");
+        assert(!!treatingPatientB.treatmentStartTime, "Patient B has recorded treatmentStartTime");
+
+        // Test 5: Complete Treatment for Doctor
+        const assignedDoc = app.doctors.find(d => d.currentPatientId === 'P-B');
+        assert(!!assignedDoc, "Found doctor assigned to Patient B", assignedDoc ? assignedDoc.name : 'None');
+        
+        app.completeTreatment(assignedDoc.id);
+        assert(assignedDoc.status === 'Available', "Doctor status reverted to Available after completing treatment");
+        assert(treatingPatientB.status === 'Completed', "Patient B status changed to 'Completed'");
+        assert(!!treatingPatientB.treatmentEndTime, "Patient B has recorded treatmentEndTime");
+
+        // Test 6: Re-Triage functionality
+        // Call Patient C, leaving Patient A in queue
+        app.callNextPatient(); // Now treating Patient C
+        assert(app.priorityQueue.peek().id === 'P-A', "Queue now has Patient A");
+
+        // Add a new P1 patient
+        const testP1 = new appWin.Patient({
+          id: 'TEST-P1',
+          name: 'Mild Sprain Patient',
+          age: 30,
+          gender: 'Female',
+          priority: 1,
+          symptoms: 'Mild ankle discomfort',
+          arrivalTime: new Date().toISOString(),
+          status: 'Waiting'
+        });
+        app.priorityQueue.enqueue(testP1);
+        app.allPatients.push(testP1);
+
+        assert(app.priorityQueue.peek().id === 'P-A', "Patient A (P3) is still ahead of TEST-P1 (P1)");
+
+        // Now elevate TEST-P1 from Priority 1 to Priority 5 (Critical)!
+        app.priorityQueue.update('TEST-P1', p => { p.priority = 5; });
+        assert(app.priorityQueue.peek().id === 'TEST-P1', "After re-triage to P5, TEST-P1 dynamically floats to root of heap!");
+
+        // Summary
+        console.log(`=== E2E Test Finished: ${passed} passed, ${failed} failed ===`);
+        const outcome = { passed, failed, results };
+
+        const container = document.getElementById('results');
+        container.innerHTML = `
+          <h2>E2E Results: ${passed} Passed, ${failed} Failed</h2>
+          <ul>
+            ${results.map(r => `<li style="color:${r.status === 'PASS' ? 'green' : 'red'}">${r.status}: ${r.name} ${r.details ? '(' + r.details + ')' : ''}</li>`).join('')}
+          </ul>
+        `;
+
+        fetch('/report-e2e-results', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(outcome)
+        }).catch(err => console.log('Report fetch error:', err));
+
+      } catch (err) {
+        console.error("E2E Test Execution Error:", err);
+        fetch('/report-e2e-results', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passed, failed: failed + 1, error: err.message, stack: err.stack, results })
+        }).catch(() => {});
+      }
+    }
+  </script>
+</body>
+</html>

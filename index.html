@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emergency Department - Priority Queue Triage System</title>
+  
+  <!-- FontAwesome 6 for Medical & UI Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Application CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <div class="brand-icon-box">
+          <i class="fas fa-heartbeat"></i>
+        </div>
+        <div class="brand-text">
+          <h1>TriageFlow ED</h1>
+          <span>Priority Queue System</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item active" data-tab="dashboard">
+          <i class="fas fa-columns"></i>
+          <span>Dashboard</span>
+        </a>
+        <a class="nav-item" data-tab="queue">
+          <i class="fas fa-list-ol"></i>
+          <span>Waiting Queue</span>
+          <span class="nav-badge" id="navQueueBadge">0</span>
+        </a>
+        <a class="nav-item" data-tab="addPatient">
+          <i class="fas fa-user-plus"></i>
+          <span>Add Patient</span>
+        </a>
+        <a class="nav-item" data-tab="doctors">
+          <i class="fas fa-user-md"></i>
+          <span>Doctors Roster</span>
+          <span class="nav-badge" id="navDoctorsBadge">0</span>
+        </a>
+        <a class="nav-item" data-tab="history">
+          <i class="fas fa-history"></i>
+          <span>Treatment History</span>
+        </a>
+        <a class="nav-item" data-tab="heapVisualizer">
+          <i class="fas fa-sitemap"></i>
+          <span>Heap Structure</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Scenario Test Quick Demo -->
+      <div class="sidebar-scenario-box">
+        <div class="scenario-header">
+          <i class="fas fa-flask"></i>
+          <span>Priority Queue Scenario</span>
+        </div>
+        <p class="scenario-text">
+          Patient A (10:00, P3)<br>
+          Patient B (10:05, P5)<br>
+          Patient C (09:55, P3)<br>
+          <strong>Order: B &rarr; C &rarr; A</strong>
+        </p>
+        <button class="btn-scenario-demo" id="btnLoadScenario">
+          <i class="fas fa-play"></i> Run Scenario Demo
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <span><i class="fas fa-hospital-alt"></i> Trauma Center Level 1</span>
+        <span>v2.4.0</span>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+      
+      <!-- Top App Bar -->
+      <header class="top-bar">
+        <div class="top-bar-left">
+          <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle Navigation">
+            <i class="fas fa-bars"></i>
+          </button>
+          <div class="page-title">
+            <h2 id="currentPageTitle">Emergency Department Dashboard</h2>
+            <p id="currentPageSubtitle">Real-time Binary Heap Priority Triage System</p>
+          </div>
+        </div>
+
+        <div class="top-bar-right">
+          <!-- Live Hospital ED Digital Clock -->
+          <div class="clock-display" title="ED Live Synchronized Clock">
+            <i class="fas fa-clock clock-icon"></i>
+            <span class="clock-time" id="hospitalLiveClock">00:00:00</span>
+            <span class="clock-date" id="hospitalLiveDate">Oct 2, 2026</span>
+          </div>
+
+          <!-- Sound Mute/Unmute Toggle -->
+          <button class="top-action-btn active" id="btnSoundToggle" title="Toggle Hospital Audio Chimes">
+            <i class="fas fa-volume-up" id="soundIcon"></i>
+            <span>Audio Chime</span>
+          </button>
+
+          <!-- Reset Sample Data -->
+          <button class="top-action-btn" id="btnResetData" title="Reset all data to default hospital demo state">
+            <i class="fas fa-sync-alt"></i>
+            <span>Reset Demo</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Body -->
+      <div class="content-body">
+
+        <!-- ============================================== -->
+        <!-- TAB 1: DASHBOARD -->
+        <!-- ============================================== -->
+        <div class="tab-pane active" id="pane-dashboard">
+          
+          <!-- Key Metric Stats Grid -->
+          <div class="stats-grid">
+            <div class="stat-card card-waiting">
+              <div class="stat-header">
+                <span class="stat-title">Total Waiting</span>
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+              </div>
+              <div class="stat-value" id="statWaitingCount">0</div>
+              <div class="stat-subtext"><i class="fas fa-layer-group"></i> In Priority Queue</div>
+            </div>
+
+            <div class="stat-card card-critical">
+              <div class="stat-header">
+                <span class="stat-title">Critical (P5)</span>
+                <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+              </div>
+              <div class="stat-value" id="statCriticalCount">0</div>
+              <div class="stat-subtext"><i class="fas fa-bell"></i> Immediate Resuscitation</div>
+            </div>
+
+            <div class="stat-card card-treating">
+              <div class="stat-header">
+                <span class="stat-title">Being Treated</span>
+                <div class="stat-icon"><i class="fas fa-procedures"></i></div>
+              </div>
+              <div class="stat-value" id="statTreatingCount">0</div>
+              <div class="stat-subtext"><i class="fas fa-stethoscope"></i> In Medical Bays</div>
+            </div>
+
+            <div class="stat-card card-doctors">
+              <div class="stat-header">
+                <span class="stat-title">Available Doctors</span>
+                <div class="stat-icon"><i class="fas fa-user-md"></i></div>
+              </div>
+              <div class="stat-value" id="statDoctorsCount">0 / 0</div>
+              <div class="stat-subtext"><i class="fas fa-check-circle"></i> Ready to Treat</div>
+            </div>
+
+            <div class="stat-card card-completed">
+              <div class="stat-header">
+                <span class="stat-title">Completed Today</span>
+                <div class="stat-icon"><i class="fas fa-clipboard-check"></i></div>
+              </div>
+              <div class="stat-value" id="statCompletedCount">0</div>
+              <div class="stat-subtext"><i class="fas fa-arrow-trend-up"></i> Discharged / Admitted</div>
+            </div>
+
+            <div class="stat-card card-time">
+              <div class="stat-header">
+                <span class="stat-title">Avg Wait Time</span>
+                <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
+              </div>
+              <div class="stat-value" id="statAvgWaitTime">0m</div>
+              <div class="stat-subtext"><i class="fas fa-stopwatch"></i> From Triage Arrival</div>
+            </div>
+          </div>
+
+          <!-- Prominent "Next Patient to Treat" Hero Section -->
+          <div class="next-patient-hero" id="nextPatientHero">
+            <!-- Populated dynamically via JS -->
+          </div>
+
+          <!-- Priority Spectrum Distribution Cards -->
+          <div class="priority-spectrum-container">
+            <div class="spectrum-header">
+              <div class="spectrum-title">
+                <i class="fas fa-sort-amount-down"></i>
+                <span>Triage Urgency Spectrum Breakdown</span>
+              </div>
+              <small style="color: var(--text-muted);"><i class="fas fa-info-circle"></i> Priority determines treatment order before arrival time</small>
+            </div>
+            <div class="spectrum-cards-grid">
+              <div class="prio-indicator-card prio-card-5">
+                <div class="prio-card-top">
+                  <span class="prio-card-title">P5 Critical</span>
+                  <span class="prio-card-count" id="prioCount5">0</span>
+                </div>
+                <span class="prio-card-desc">Red &bull; Immediate</span>
+              </div>
+              <div class="prio-indicator-card prio-card-4">
+                <div class="prio-card-top">
+                  <span class="prio-card-title">P4 Very Urgent</span>
+                  <span class="prio-card-count" id="prioCount4">0</span>
+                </div>
+                <span class="prio-card-desc">Orange &bull; &le; 15 mins</span>
+              </div>
+              <div class="prio-indicator-card prio-card-3">
+                <div class="prio-card-top">
+                  <span class="prio-card-title">P3 Urgent</span>
+                  <span class="prio-card-count" id="prioCount3">0</span>
+                </div>
+                <span class="prio-card-desc">Yellow &bull; &le; 30 mins</span>
+              </div>
+              <div class="prio-indicator-card prio-card-2">
+                <div class="prio-card-top">
+                  <span class="prio-card-title">P2 Less Urgent</span>
+                  <span class="prio-card-count" id="prioCount2">0</span>
+                </div>
+                <span class="prio-card-desc">Blue &bull; &le; 60 mins</span>
+              </div>
+              <div class="prio-indicator-card prio-card-1">
+                <div class="prio-card-top">
+                  <span class="prio-card-title">P1 Non-Urgent</span>
+                  <span class="prio-card-count" id="prioCount1">0</span>
+                </div>
+                <span class="prio-card-desc">Green &bull; &le; 120 mins</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual Section: Active Treatments & Upcoming Queue Preview -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px;">
+            
+            <!-- Currently Being Treated -->
+            <div class="section-card">
+              <div class="section-card-header">
+                <div class="header-left">
+                  <i class="fas fa-stethoscope" style="color: var(--warning);"></i>
+                  <h3>Active Treatment Bays</h3>
+                </div>
+                <span class="header-counter" id="activeBaysCounter">0 Active</span>
+              </div>
+              <div id="dashboardActiveTreatmentsList" style="padding: 16px;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Priority Queue Head Preview -->
+            <div class="section-card">
+              <div class="section-card-header">
+                <div class="header-left">
+                  <i class="fas fa-list-ol" style="color: var(--primary);"></i>
+                  <h3>Queue Head (Next in Line)</h3>
+                </div>
+                <button class="top-action-btn" onclick="app.switchTab('queue')">
+                  <span>View All</span> <i class="fas fa-arrow-right"></i>
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Priority</th>
+                      <th>Patient</th>
+                      <th>Wait Time</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboardQueuePreviewTable">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 2: WAITING QUEUE -->
+        <!-- ============================================== -->
+        <div class="tab-pane" id="pane-queue">
+          <div class="section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <i class="fas fa-list-ol" style="color: var(--primary);"></i>
+                <h3>Emergency Department Priority Waiting Queue</h3>
+                <span class="header-counter" id="queueTotalCounter">0 Patients</span>
+              </div>
+              <div class="header-actions">
+                <button class="btn-primary" id="btnQueueCallNext">
+                  <i class="fas fa-bullhorn"></i> Call Next Patient
+                </button>
+                <button class="top-action-btn" onclick="app.switchTab('heapVisualizer')">
+                  <i class="fas fa-sitemap"></i> View Heap Tree
+                </button>
+              </div>
+            </div>
+
+            <!-- Queue Filter & Search Bar -->
+            <div class="presets-bar" style="justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span class="presets-label"><i class="fas fa-filter"></i> Filter Priority:</span>
+                <button class="btn-preset active" data-filter-prio="all">All</button>
+                <button class="btn-preset" data-filter-prio="5">P5 Critical</button>
+                <button class="btn-preset" data-filter-prio="4">P4 Very Urgent</button>
+                <button class="btn-preset" data-filter-prio="3">P3 Urgent</button>
+                <button class="btn-preset" data-filter-prio="2">P2 Less Urgent</button>
+                <button class="btn-preset" data-filter-prio="1">P1 Non-Urgent</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="text" id="queueSearchInput" class="form-input" placeholder="Search ID, name, symptoms..." style="width: 240px; padding: 6px 12px;">
+              </div>
+            </div>
+
+            <!-- Main Queue Table -->
+            <div class="table-responsive">
+              <table class="data-table" id="waitingQueueTable">
+                <thead>
+                  <tr>
+                    <th style="width: 60px;">Order</th>
+                    <th>Patient ID & Name</th>
+                    <th>Priority</th>
+                    <th>Age / Gender</th>
+                    <th>Symptoms / Chief Complaint</th>
+                    <th>Arrival Time</th>
+                    <th>Wait Duration</th>
+                    <th>Assigned Doctor</th>
+                    <th style="text-align: right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="waitingQueueTableBody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 3: ADD PATIENT -->
+        <!-- ============================================== -->
+        <div class="tab-pane" id="pane-addPatient">
+          <div class="section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <i class="fas fa-user-plus" style="color: var(--primary);"></i>
+                <h3>Emergency Department Triage &amp; Intake</h3>
+              </div>
+              <span style="font-size: 12px; color: var(--text-muted);"><i class="fas fa-info-circle"></i> Intake inserts patient into Binary Max-Heap Priority Queue</span>
+            </div>
+
+            <!-- Preset Quick-Fill Buttons -->
+            <div class="presets-bar">
+              <span class="presets-label"><i class="fas fa-magic"></i> Quick Presets:</span>
+              <button class="btn-preset" id="presetP5"><i class="fas fa-bolt" style="color:#ef4444;"></i> P5: STEMI Chest Pain</button>
+              <button class="btn-preset" id="presetP4"><i class="fas fa-exclamation" style="color:#f97316;"></i> P4: Head Trauma</button>
+              <button class="btn-preset" id="presetP3"><i class="fas fa-notes-medical" style="color:#eab308;"></i> P3: Acute Appendicitis</button>
+              <button class="btn-preset" id="presetP2"><i class="fas fa-walking" style="color:#3b82f6;"></i> P2: Ankle Fracture</button>
+              <button class="btn-preset" id="presetP1"><i class="fas fa-prescription" style="color:#10b981;"></i> P1: Prescription Refill</button>
+            </div>
+
+            <!-- Intake Form -->
+            <form id="addPatientForm">
+              <div class="form-grid">
+                
+                <div class="form-group">
+                  <label class="form-label" for="patientIdInput">
+                    Patient ID <span class="required">*</span>
+                  </label>
+                  <input type="text" id="patientIdInput" class="form-input" required readonly style="background:#f8fafc; font-weight:700;">
+                  <span class="error-message" id="errorPatientId"></span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="patientNameInput">
+                    Patient Full Name <span class="required">*</span>
+                  </label>
+                  <input type="text" id="patientNameInput" class="form-input" placeholder="e.g. Eleanor Vance" required>
+                  <span class="error-message" id="errorPatientName"></span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="patientAgeInput">
+                    Age <span class="required">*</span>
+                  </label>
+                  <input type="number" id="patientAgeInput" class="form-input" placeholder="e.g. 45" min="0" max="125" required>
+                  <span class="error-message" id="errorPatientAge"></span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="patientGenderSelect">
+                    Gender <span class="required">*</span>
+                  </label>
+                  <select id="patientGenderSelect" class="form-select" required>
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Other">Other / Non-Binary</option>
+                  </select>
+                  <span class="error-message" id="errorPatientGender"></span>
+                </div>
+
+                <!-- Priority Selection Level -->
+                <div class="form-group full-width">
+                  <label class="form-label">
+                    Emergency Priority Level <span class="required">*</span>
+                    <small style="color:var(--text-muted); font-weight:normal;">Higher numerical priority is treated first</small>
+                  </label>
+                  <div class="priority-selector-grid">
+                    <div class="priority-option" data-level="5">
+                      <span class="prio-opt-level" style="color:var(--prio-5-red);">5</span>
+                      <span class="prio-opt-name" style="color:var(--prio-5-red);">Critical</span>
+                      <small style="font-size:10px; color:#94a3b8;">Red &bull; Immediate</small>
+                    </div>
+                    <div class="priority-option" data-level="4">
+                      <span class="prio-opt-level" style="color:var(--prio-4-orange);">4</span>
+                      <span class="prio-opt-name" style="color:var(--prio-4-orange);">Very Urgent</span>
+                      <small style="font-size:10px; color:#94a3b8;">Orange &bull; 15m</small>
+                    </div>
+                    <div class="priority-option selected" data-level="3">
+                      <span class="prio-opt-level" style="color:var(--prio-3-yellow);">3</span>
+                      <span class="prio-opt-name" style="color:var(--prio-3-yellow);">Urgent</span>
+                      <small style="font-size:10px; color:#94a3b8;">Yellow &bull; 30m</small>
+                    </div>
+                    <div class="priority-option" data-level="2">
+                      <span class="prio-opt-level" style="color:var(--prio-2-blue);">2</span>
+                      <span class="prio-opt-name" style="color:var(--prio-2-blue);">Less Urgent</span>
+                      <small style="font-size:10px; color:#94a3b8;">Blue &bull; 60m</small>
+                    </div>
+                    <div class="priority-option" data-level="1">
+                      <span class="prio-opt-level" style="color:var(--prio-1-green);">1</span>
+                      <span class="prio-opt-name" style="color:var(--prio-1-green);">Non-Urgent</span>
+                      <small style="font-size:10px; color:#94a3b8;">Green &bull; 120m</small>
+                    </div>
+                  </div>
+                  <input type="hidden" id="selectedPriorityInput" value="3">
+                  <span class="error-message" id="errorPatientPriority"></span>
+                </div>
+
+                <div class="form-group full-width">
+                  <label class="form-label" for="patientSymptomsInput">
+                    Symptoms / Reason for Visit <span class="required">*</span>
+                  </label>
+                  <textarea id="patientSymptomsInput" class="form-textarea" placeholder="Describe chief complaint, clinical observation, vitals or trauma details..." required></textarea>
+                  <span class="error-message" id="errorPatientSymptoms"></span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="patientArrivalTimeInput">
+                    Arrival Time (Default: Now) <span class="required">*</span>
+                  </label>
+                  <input type="datetime-local" id="patientArrivalTimeInput" class="form-input" required>
+                  <small style="font-size:11px; color:var(--text-muted);">Adjustable for testing arrival-time tie breakers</small>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="patientDoctorSelect">
+                    Optional Assigned Doctor
+                  </label>
+                  <select id="patientDoctorSelect" class="form-select">
+                    <option value="">-- Auto-assign on Call Next --</option>
+                  </select>
+                </div>
+
+              </div>
+
+              <div class="form-footer">
+                <button type="button" class="btn-secondary" id="btnClearForm">Clear Form</button>
+                <button type="submit" class="btn-primary" id="btnSubmitPatient">
+                  <i class="fas fa-plus-circle"></i> Add Patient to Priority Queue
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 4: DOCTOR MANAGEMENT -->
+        <!-- ============================================== -->
+        <div class="tab-pane" id="pane-doctors">
+          <div class="section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <i class="fas fa-user-md" style="color: var(--primary);"></i>
+                <h3>Emergency Department Medical Staff Roster</h3>
+              </div>
+              <div class="header-actions">
+                <button class="btn-primary" id="btnOpenAddDoctorModal">
+                  <i class="fas fa-plus"></i> Add Doctor
+                </button>
+              </div>
+            </div>
+
+            <!-- Doctors Grid -->
+            <div class="doctors-grid" id="doctorsRosterGrid">
+              <!-- Populated dynamically via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 5: TREATMENT HISTORY & SEARCH -->
+        <!-- ============================================== -->
+        <div class="tab-pane" id="pane-history">
+          <div class="section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <i class="fas fa-history" style="color: var(--primary);"></i>
+                <h3>Patient Directory &amp; Treatment History</h3>
+              </div>
+              <div class="header-actions">
+                <button class="top-action-btn" id="btnExportCSV">
+                  <i class="fas fa-file-csv"></i> Export CSV
+                </button>
+                <button class="top-action-btn" onclick="window.print()">
+                  <i class="fas fa-print"></i> Print Report
+                </button>
+              </div>
+            </div>
+
+            <!-- Search, Status, Priority & Doctor Filter -->
+            <div class="presets-bar" style="gap: 12px; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <input type="text" id="historySearchInput" class="form-input" placeholder="Search by ID, name, symptoms, doctor..." style="width: 260px; padding: 6px 12px;">
+                
+                <select id="historyFilterStatus" class="form-select" style="width: 150px; padding: 6px 10px;">
+                  <option value="all">All Statuses</option>
+                  <option value="Waiting">Waiting</option>
+                  <option value="Being Treated">Being Treated</option>
+                  <option value="Completed">Completed</option>
+                </select>
+
+                <select id="historyFilterPriority" class="form-select" style="width: 150px; padding: 6px 10px;">
+                  <option value="all">All Priorities</option>
+                  <option value="5">P5 Critical</option>
+                  <option value="4">P4 Very Urgent</option>
+                  <option value="3">P3 Urgent</option>
+                  <option value="2">P2 Less Urgent</option>
+                  <option value="1">P1 Non-Urgent</option>
+                </select>
+              </div>
+
+              <div style="font-size: 12px; color: var(--text-muted);" id="historyMatchCount">
+                Showing all records
+              </div>
+            </div>
+
+            <!-- Treatment History Table -->
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Patient ID</th>
+                    <th>Name</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Arrival Time</th>
+                    <th>Treatment Start</th>
+                    <th>Completion Time</th>
+                    <th>Physician</th>
+                    <th>Wait Duration</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="treatmentHistoryTableBody">
+                  <!-- Populated dynamically via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 6: BINARY HEAP STRUCTURE VISUALIZER -->
+        <!-- ============================================== -->
+        <div class="tab-pane" id="pane-heapVisualizer">
+          <div class="section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <i class="fas fa-sitemap" style="color: var(--primary);"></i>
+                <h3>Binary Max-Heap Internal Data Structure</h3>
+              </div>
+              <span class="header-counter" id="heapNodesCount">0 Nodes</span>
+            </div>
+
+            <div class="heap-visualizer-container">
+              <div class="heap-explanation">
+                <strong><i class="fas fa-brain"></i> Algorithmic Invariant:</strong>
+                The waiting queue is maintained using a <strong>Binary Max-Heap</strong>.
+                Each node at index <code>i</code> satisfies <code>precedence(heap[i]) &ge; precedence(heap[leftChild])</code> and <code>precedence(heap[i]) &ge; precedence(heap[rightChild])</code>.
+                Higher emergency priority floats to the root (index 0). In case of identical priorities, earlier arrival time takes precedence.
+                This guarantees <strong>O(1)</strong> immediate identification of the next patient and <strong>O(log n)</strong> additions and extractions.
+              </div>
+
+              <!-- Array Level-Order Cells -->
+              <div class="heap-array-view">
+                <div class="heap-array-title">
+                  <i class="fas fa-layer-group"></i> Array Level-Order Memory Representation <code>[0 ... n-1]</code>
+                </div>
+                <div class="heap-array-cells" id="heapArrayCellsContainer">
+                  <!-- Populated dynamically -->
+                </div>
+              </div>
+
+              <!-- Visual Tree Canvas -->
+              <div class="heap-tree-canvas-wrapper">
+                <canvas id="heapTreeCanvas" width="900" height="380"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- /content-body -->
+
+    </main>
+  </div> <!-- /app-container -->
+
+  <!-- ============================================== -->
+  <!-- MODAL: PATIENT DETAILS & CLINICAL TRIAGE SHEET -->
+  <!-- ============================================== -->
+  <div class="modal-overlay" id="patientDetailsModal">
+    <div class="modal-container modal-lg">
+      <div class="modal-header">
+        <h3><i class="fas fa-id-card-alt" style="color:var(--primary);"></i> Clinical Patient Profile</h3>
+        <button class="modal-close-btn" data-close-modal>&times;</button>
+      </div>
+      <div class="modal-body" id="patientDetailsBody">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close-modal>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: RE-TRIAGE PRIORITY -->
+  <!-- ============================================== -->
+  <div class="modal-overlay" id="retriageModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3><i class="fas fa-exchange-alt" style="color:var(--warning);"></i> Re-Triage Patient Urgency</h3>
+        <button class="modal-close-btn" data-close-modal>&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:12px; color:var(--text-secondary); font-size:13px;">
+          Adjust emergency priority level for <strong id="retriagePatientName">Patient</strong> (<span id="retriagePatientId">ID</span>).
+          The binary heap will dynamically sift the patient up or down in O(log n) time.
+        </p>
+
+        <div class="priority-selector-grid" id="retriagePriorityGrid">
+          <div class="priority-option" data-level="5">
+            <span class="prio-opt-level" style="color:var(--prio-5-red);">5</span>
+            <span class="prio-opt-name" style="color:var(--prio-5-red);">Critical</span>
+          </div>
+          <div class="priority-option" data-level="4">
+            <span class="prio-opt-level" style="color:var(--prio-4-orange);">4</span>
+            <span class="prio-opt-name" style="color:var(--prio-4-orange);">Very Urgent</span>
+          </div>
+          <div class="priority-option" data-level="3">
+            <span class="prio-opt-level" style="color:var(--prio-3-yellow);">3</span>
+            <span class="prio-opt-name" style="color:var(--prio-3-yellow);">Urgent</span>
+          </div>
+          <div class="priority-option" data-level="2">
+            <span class="prio-opt-level" style="color:var(--prio-2-blue);">2</span>
+            <span class="prio-opt-name" style="color:var(--prio-2-blue);">Less Urgent</span>
+          </div>
+          <div class="priority-option" data-level="1">
+            <span class="prio-opt-level" style="color:var(--prio-1-green);">1</span>
+            <span class="prio-opt-name" style="color:var(--prio-1-green);">Non-Urgent</span>
+          </div>
+        </div>
+
+        <input type="hidden" id="retriageSelectedLevel" value="3">
+
+        <div class="form-group" style="margin-top:16px;">
+          <label class="form-label" for="retriageNotesInput">Clinical Re-Triage Reason</label>
+          <input type="text" id="retriageNotesInput" class="form-input" placeholder="e.g. Condition deteriorated, acute onset of chest pain...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close-modal>Cancel</button>
+        <button class="btn-primary" id="btnConfirmRetriage">Update Urgency Level</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: ADD DOCTOR -->
+  <!-- ============================================== -->
+  <div class="modal-overlay" id="addDoctorModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-md" style="color:var(--primary);"></i> Add Emergency Physician</h3>
+        <button class="modal-close-btn" data-close-modal>&times;</button>
+      </div>
+      <form id="addDoctorForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="docNameInput">Doctor Name <span class="required">*</span></label>
+            <input type="text" id="docNameInput" class="form-input" placeholder="e.g. Dr. Jordan Cole, MD" required>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label" for="docSpecialtyInput">Specialization / Department <span class="required">*</span></label>
+            <input type="text" id="docSpecialtyInput" class="form-input" placeholder="e.g. Emergency Medicine, Trauma Surgery" required>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label" for="docStatusSelect">Initial Status</label>
+            <select id="docStatusSelect" class="form-select">
+              <option value="Available">Available</option>
+              <option value="Busy">Busy</option>
+              <option value="Off Duty">Off Duty</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn-primary">Add Doctor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: SCENARIO WALKTHROUGH DEMO -->
+  <!-- ============================================== -->
+  <div class="modal-overlay" id="scenarioModal">
+    <div class="modal-container modal-lg">
+      <div class="modal-header">
+        <h3><i class="fas fa-graduation-cap" style="color:var(--primary);"></i> Priority Queue Scenario Verification</h3>
+        <button class="modal-close-btn" data-close-modal>&times;</button>
+      </div>
+      <div class="modal-body" id="scenarioModalBody">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close-modal>Close</button>
+        <button class="btn-primary" id="btnApplyScenarioData">
+          <i class="fas fa-check"></i> Load Scenario Into Queue
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Application Scripts -->
+  <script src="js/priorityQueue.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Priority Queue Unit Tests</title>
+  <script>
+    window.__errors = [];
+    window.addEventListener('error', function(e) {
+      window.__errors.push({ message: e.message, filename: e.filename, lineno: e.lineno, colno: e.colno });
+    });
+  </script>
+</head>
+<body>
+  <h1>Priority Queue Unit Tests</h1>
+  <div id="results">Running tests...</div>
+  <script src="/js/priorityQueue.js"></script>
+  <script src="/tests/test-pq.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.__errors.length > 0) {
+          throw new Error("Script error before test execution: " + JSON.stringify(window.__errors));
+        }
+        const outcome = window.runPQTests();
+        const container = document.getElementById('results');
+        container.innerHTML = `
+          <h2>Result: ${outcome.passed} Passed, ${outcome.failed} Failed</h2>
+          <ul>
+            ${outcome.results.map(r => `<li style="color:${r.status === 'PASS' ? 'green' : 'red'}">${r.status}: ${r.name} ${r.details ? '(' + r.details + ')' : ''}</li>`).join('')}
+          </ul>
+        `;
+        fetch('/report-results', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(outcome)
+        }).catch(e => console.log('Fetch error:', e));
+      } catch (err) {
+        console.error("Test execution failed:", err);
+        fetch('/report-results', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passed: 0, failed: 1, error: err.message, stack: err.stack })
+        }).catch(() => {});
+      }
+    });
+  </script>
+</body>
+</html>
